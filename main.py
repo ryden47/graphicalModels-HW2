@@ -1,11 +1,12 @@
 import numpy as np
 from itertools import product
 
+
 G = lambda row_s, temp: \
-    np.exp((1 / temp) * sum(np.multiply(row_s[:-1], row_s[1:])))
+    np.exp((1 / temp) * sum(row_s[:-1]*row_s[1:]))
 
 F = lambda row_s, row_t, temp: \
-    np.exp((1 / temp) * sum(np.multiply(row_s, row_t)))
+    np.exp((1 / temp) * sum(row_s*row_t))
 
 
 def neighbors(X, returnSet=False):
@@ -44,7 +45,7 @@ def y2row(y, width=8):
 def Z_temp(temp, ex):
     '''
     :param temp: The desired temperature
-    :param ex: Number of exercise (3,4,5)
+    :param ex: Number of exercise (3,4,5,6)
     :return: The computation of Z_temp
     '''
     ans = 0
@@ -64,7 +65,6 @@ def Z_temp(temp, ex):
                   F(y2row(Y[0], width=3), y2row(Y[1], width=3), temp) *
                   F(y2row(Y[1], width=3), y2row(Y[2], width=3), temp)
                     for Y in product(range(8), repeat=3))
-
     return ans
 
 
