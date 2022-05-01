@@ -42,6 +42,22 @@ def y2row(y, width=8):
     return row
 
 
+def T(k, temp):
+    if k == 1:
+        return lambda y2: sum(G(y2row(y1), temp) *
+                              F(y2row(y1), y2row(y2), temp)
+                                for y1 in range(256))
+    if k in [2,3,4,5,6,7]:
+        return lambda y_k_plus1: sum(T(k-1, temp)(y_k) *
+                                     G(y2row(y_k), temp) *
+                                     F(y2row(y_k), y2row(y_k_plus1), temp)
+                                        for y_k in range(256))
+    if k == 8:
+        return sum(T(7, temp)(y_8) *
+                   G(y2row(y_8), temp)
+                    for y_8 in range(256))
+
+
 def Z_temp(temp, ex):
     '''
     :param temp: The desired temperature
@@ -65,18 +81,37 @@ def Z_temp(temp, ex):
                   F(y2row(Y[0], width=3), y2row(Y[1], width=3), temp) *
                   F(y2row(Y[1], width=3), y2row(Y[2], width=3), temp)
                     for Y in product(range(8), repeat=3))
+    elif ex == 7:
+        ans = T(8, temp=temp)
     return ans
 
 
 if __name__ == '__main__':
-    print("Exercise 3 (2x2 lattice):")
-    print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=3)}\n' for i in [1, 1.5, 2]])
+    # print("Exercise 3 (2x2 lattice):")
+    # print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=3)}\n' for i in [1, 1.5, 2]])
+    #
+    # print("Exercise 4 (3x3 lattice):")
+    # print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=4)}\n' for i in [1, 1.5, 2]])
+    #
+    # print("Exercise 5 (2x2 lattice):")
+    # print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=5)}\n' for i in [1, 1.5, 2]])
+    #
+    # print("Exercise 6: (3x3 lattice)")
+    # print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=6)}\n' for i in [1, 1.5, 2]])
 
-    print("Exercise 4 (3x3 lattice):")
-    print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=4)}\n' for i in [1, 1.5, 2]])
+    print(Z_temp(temp=1, ex=7)(y2=1))
 
-    print("Exercise 5 (2x2 lattice):")
-    print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=5)}\n' for i in [1, 1.5, 2]])
 
-    print("Exercise 6: (3x3 lattice)")
-    print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=6)}\n' for i in [1, 1.5, 2]])
+    # import time
+    # tic_s1 = time.perf_counter()
+    # for i in range(1000):
+    #     [f'Z(temp={i})  =  {Z_temp(temp=i, ex=4)}\n' for i in [1, 1.5, 2]]
+    # tic_e1 = time.perf_counter()
+    #
+    # tic_s2 = time.perf_counter()
+    # for i in range(1000):
+    #     [f'Z(temp={i})  =  {Z_temp(temp=i, ex=6)}\n' for i in [1, 1.5, 2]]
+    # tic_e2 = time.perf_counter()
+    #
+    # print(f' First methods time: {tic_e1 - tic_s1:0.4f} seconds')
+    # print(f'Second methods time: {tic_e2 - tic_s2:0.4f} seconds')
