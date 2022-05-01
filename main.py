@@ -43,6 +43,17 @@ def y2row(y, width=8):
 
 
 def T(k, temp):
+    # WORKS FOR width=2
+    if k == 1:
+        return lambda y2: sum(G(y2row(y1, width=2), temp) *
+                              F(y2row(y1, width=2), y2row(y2, width=2), temp)
+                                for y1 in range(4))
+    if k == 2:
+        return sum(T(1, temp)(y_2) *
+                   G(y2row(y_2, width=2), temp)
+                    for y_2 in range(4))
+    # -------------------------
+
     if k == 1:
         return lambda y2: sum(G(y2row(y1), temp) *
                               F(y2row(y1), y2row(y2), temp)
@@ -82,7 +93,7 @@ def Z_temp(temp, ex):
                   F(y2row(Y[1], width=3), y2row(Y[2], width=3), temp)
                     for Y in product(range(8), repeat=3))
     elif ex == 7:
-        ans = T(8, temp=temp)
+        ans = T(2, temp=temp)
     return ans
 
 
@@ -99,7 +110,7 @@ if __name__ == '__main__':
     # print("Exercise 6: (3x3 lattice)")
     # print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=6)}\n' for i in [1, 1.5, 2]])
 
-    print(Z_temp(temp=1, ex=7)(y2=1))
+    print(Z_temp(temp=1, ex=7))
 
 
     # import time
