@@ -89,7 +89,14 @@ def T(k, temp):  # OLD VERSION - takes forever runtime!
 
 
 def T_iterative(temp, n=8):
-    # tic = time.perf_counter()
+    '''
+    :param temp: Temperature
+    :param n: Dimension of lattice (n x n)
+    :return: T_n = Ztemp
+             T_res = matrix of all Ti calculations [T[i][j] = Ti(y=j) for j in [0,1,...,(2^n)-1]]
+             P = A list of P calculations. P[1]=P_1|2, P[2]=P_2|3, ..., P[8]=P_8
+    '''
+    tic = time.perf_counter()
     init_tables()
     T_res = np.array([None]*(2**n)*n).reshape(n, 2**n)  # memo - keeping results iteratively. saving HUGE time.
 
@@ -102,10 +109,25 @@ def T_iterative(temp, n=8):
             for y in range(2**n):
                 T_res[t][y] = sum(T_res[t-1][y0] * G_(y0, temp, width=n) * F_(y0, y, temp, width=n)
                                   for y0 in range(2**n))
+    T_n = sum(T_res[n-1][y] * G_(y, temp) for y in range(2**n))
 
-    T_final = sum(T_res[n-1][y] * G_(y, temp) for y in range(2**n))
-    # print(f'T_iterative took {time.perf_counter()-tic:0.4f} seconds!')
-    return T_final, T_res
+    P, P1 = [["skip index 0"]], np.array([None] * (2 ** n) * (2 ** n)).reshape(2 ** n, 2 ** n)
+    for y1 in range(2**n):
+        for y2 in range(2**n):
+            P1[y1][y2] = (G_(y1, temp, n) * F_(y1, y2, temp, n)) / T_res[1][y2]
+    P.append(P1)
+    for k in range(2, n):
+        P_yk_ykPlus1 = np.array([None] * (2 ** n) * (2 ** n)).reshape(2 ** n, 2 ** n)
+        for y_k in range(2**n):
+            for y_kPlus1 in range(2**n):
+                P_yk_ykPlus1[y_k][y_kPlus1] = (T_res[k-1][y_k] * G_(y_k, temp, n) * F_(y_k, y_kPlus1, temp, n)) / T_res[k][y_kPlus1]
+        P.append(P_yk_ykPlus1)
+    P_n = np.array([None] * (2**n))
+    for y in range(2**n):
+        P_n[y] = (T_res[n-1][y] * G_(y, temp, n)) / T_n
+    P.append(P_n)
+    print(f'T_iterative took {time.perf_counter()-tic:0.4f} seconds! (temp={temp}, n={n})')
+    return T_n, T_res, P
 
 
 def Z_temp(temp, ex):
@@ -131,8 +153,8 @@ def Z_temp(temp, ex):
                    F(y2row(Y[1], width=3), y2row(Y[2], width=3), temp)
                    for Y in product(range(8), repeat=3))
     elif ex == 7:
-        Z, T_res = T_iterative(temp, n=8)
-        return Z, T_res
+        Z, T_res, P = T_iterative(temp, n=8)
+        return Z, T_res, P
     return None
 
 
@@ -151,3 +173,4 @@ if __name__ == '__main__':
 
     print("Exercise 7: (8x8 lattice)      --  NOT FINISHED!")
     print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=7)[0]}\n' for i in [1, 1.5, 2]])
+
