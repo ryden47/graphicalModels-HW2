@@ -1,6 +1,7 @@
 import numpy as np
 from itertools import product
 import time
+import matplotlib.pyplot as plt
 
 
 def init_tables(n=8):
@@ -72,62 +73,60 @@ def y2row(y, width=8):
     return row
 
 
-def T(k, temp):  # OLD VERSION - takes forever runtime!
-    if k == 1:
-        return lambda y2: sum(G(y2row(y1), temp) *
-                              F(y2row(y1), y2row(y2), temp)
-                              for y1 in range(256))
-    if k == 8:
-        return sum(T(7, temp)(y8) *
-                   G(y2row(y8), temp)
-                   for y8 in range(256))
-    else:  # k == 2,3,4,5,6,7
-        return lambda y_kPlus1: sum(T(k-1, temp)(y_k) *
-                                    G(y2row(y_k), temp) *
-                                    F(y2row(y_k), y2row(y_kPlus1), temp)
-                                    for y_k in range(256))
-
-
-def T_iterative(temp, n=8):
+def find_P(temp, n=8):
     '''
     :param temp: Temperature
     :param n: Dimension of lattice (n x n)
-    :return: T_n = Ztemp
-             T_res = matrix of all Ti calculations [T[i][j] = Ti(y=j) for j in [0,1,...,(2^n)-1]]
-             P = A list of P calculations. P[1]=P_1|2, P[2]=P_2|3, ..., P[8]=P_8
+    :return: P = A list of P calculations. P[1]=P_1|2, P[2]=P_2|3, ..., P[8]=P_8
+                [example: in the matrix P[7], we say: given y8 (the column), the distribution of y7=k is (P[7])[y8][y7]]
     '''
-    tic = time.perf_counter()
     init_tables()
     T_res = np.array([None]*(2**n)*n).reshape(n, 2**n)  # memo - keeping results iteratively. saving HUGE time.
+    T_res[0][:] = 1
 
     for t in range(1, n):
-        if t == 1:
-            for y in range(2**n):
-                T_res[t][y] = sum(G_(y1, temp, width=n) * F_(y1, y, temp, width=n)
-                                  for y1 in range(2**n))
-        else:
-            for y in range(2**n):
-                T_res[t][y] = sum(T_res[t-1][y0] * G_(y0, temp, width=n) * F_(y0, y, temp, width=n)
-                                  for y0 in range(2**n))
+        for y in range(2**n):
+            T_res[t][y] = sum(T_res[t-1][y0] * G_(y0, temp, width=n) * F_(y0, y, temp, width=n)
+                              for y0 in range(2**n))
     T_n = sum(T_res[n-1][y] * G_(y, temp) for y in range(2**n))
 
-    P, P1 = [["skip index 0"]], np.array([None] * (2 ** n) * (2 ** n)).reshape(2 ** n, 2 ** n)
-    for y1 in range(2**n):
-        for y2 in range(2**n):
-            P1[y1][y2] = (G_(y1, temp, n) * F_(y1, y2, temp, n)) / T_res[1][y2]
-    P.append(P1)
-    for k in range(2, n):
-        P_yk_ykPlus1 = np.array([None] * (2 ** n) * (2 ** n)).reshape(2 ** n, 2 ** n)
-        for y_k in range(2**n):
-            for y_kPlus1 in range(2**n):
-                P_yk_ykPlus1[y_k][y_kPlus1] = (T_res[k-1][y_k] * G_(y_k, temp, n) * F_(y_k, y_kPlus1, temp, n)) / T_res[k][y_kPlus1]
-        P.append(P_yk_ykPlus1)
-    P_n = np.array([None] * (2**n))
-    for y in range(2**n):
-        P_n[y] = (T_res[n-1][y] * G_(y, temp, n)) / T_n
+    P = [["skip idx 0"]]
+    for k in range(1, n):
+        P_yk_yk1 = np.array([[(T_res[k-1][y_k] * G_(y_k, temp, n) * F_(y_k, y_k1, temp, n)) / T_res[k][y_k1]
+                            for y_k1 in range(2**n)] for y_k in range(2**n)])
+        P.append(P_yk_yk1)
+    P_n = np.array([(T_res[n-1][y] * G_(y, temp, n)) / T_n
+                    for y in range(2**n)], dtype='float64')
     P.append(P_n)
-    print(f'T_iterative took {time.perf_counter()-tic:0.4f} seconds! (temp={temp}, n={n})')
-    return T_n, T_res, P
+    return P
+
+
+def generateImage(P):
+    n = len(P)-1
+    y_n = np.random.choice(range(2**n), p=P[n])
+    image = y2row(y_n, width=n)
+    y_iPlus1 = y_n
+    for i in range(n-1, 0, -1):
+        y_i = np.random.choice(range(2**n), p=P[i].transpose()[y_iPlus1])
+        image = np.append(y2row(y_i, width=n), image)
+        y_iPlus1 = y_i
+    image = image.reshape(n, n)
+    return image
+
+
+def exercise7(temps, imgPerTemp, dim):
+    P_all = [find_P(temp=t, n=dim) for t in temps]
+    images = [[generateImage(P_all[t]) for i in range(imgPerTemp)] for t in range(len(temps))]
+    fig, ax = plt.subplots(len(temps), imgPerTemp)
+    for t in range(len(temps)):
+        for m in range(10):
+            ax[t, m].imshow(images[t][m], interpolation='None', cmap='Greys', vmin=-1, vmax=1)
+    for ax1, t_label in zip(ax[:, 0], [f"Temp {t}" for t in temps]):
+        ax1.set_ylabel(t_label, rotation=90, size=24)
+    fig.set_size_inches(25, 10)
+    fig.tight_layout()
+    fig.suptitle(f"Exercise 7: Results for a {dim}x{dim} lattice:", fontsize=32)
+    plt.show()
 
 
 def Z_temp(temp, ex):
@@ -152,9 +151,6 @@ def Z_temp(temp, ex):
                    F(y2row(Y[0], width=3), y2row(Y[1], width=3), temp) *
                    F(y2row(Y[1], width=3), y2row(Y[2], width=3), temp)
                    for Y in product(range(8), repeat=3))
-    elif ex == 7:
-        Z, T_res, P = T_iterative(temp, n=8)
-        return Z, T_res, P
     return None
 
 
@@ -172,5 +168,18 @@ if __name__ == '__main__':
     print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=6)}\n' for i in [1, 1.5, 2]])
 
     print("Exercise 7: (8x8 lattice)      --  NOT FINISHED!")
-    print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=7)[0]}\n' for i in [1, 1.5, 2]])
+    exercise7(temps=[1, 1.5, 2], imgPerTemp=10, dim=8)
+    # print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=7)[0]}\n' for i in [1, 1.5, 2]])
+
+    # P = Z_temp(temp=1, ex=7)[2]
+    # pc = [None for i in range(9)]
+    # pp = np.array([None for i in range(9)])
+    # for i in range(8, 0, -1):
+    #     pc[i] = np.random.choice(range(256))
+    # for i in range(8, 0, -1):
+    #     if i==8:
+    #         pp[i] = P[i][pc[i]]
+    #     else:
+    #         pp[i] = P[i][pc[i]][pc[i+1]]
+    # p8 = np.random.choice(range(256))
 
