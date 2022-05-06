@@ -1,5 +1,4 @@
 import numpy as np
-from itertools import product
 import time
 import matplotlib.pyplot as plt
 
@@ -40,25 +39,6 @@ F = lambda row_s, row_t, temp: \
     np.exp((1 / temp) * sum(row_s*row_t))
 
 
-def neighbors(X, returnSet=False):
-    '''
-    :param X: The lattice matrix
-    :param returnSet:  False[DEFAULT] = Return sum of Xi*Xj (when Xi and Xj are neighbors)
-                       True = Return the set of all neighbors.
-    :return: Depends on returnSet
-    '''
-    sum, neighbors = 0, []
-    for i in range(0, X.shape[0]):
-        for j in range(0, X.shape[1]):
-            if j + 1 < X.shape[1]:
-                neighbors.append([X[i][j], X[i][j + 1]]) if returnSet else None
-                sum += X[i][j] * X[i][j + 1]
-            if i + 1 < X.shape[0]:
-                neighbors.append([X[i][j], X[i + 1][j]]) if returnSet else None
-                sum += X[i][j] * X[i + 1][j]
-    return neighbors if returnSet else sum
-
-
 def y2row(y, width=8):
     """
     y: an integer in (0,...,(2**width)-1)
@@ -74,12 +54,12 @@ def y2row(y, width=8):
 
 
 def find_P(temp, n=8):
-    '''
+    """
     :param temp: Temperature
     :param n: Dimension of lattice (n x n)
     :return: P = A list of P calculations. P[1]=P_1|2, P[2]=P_2|3, ..., P[8]=P_8
                 [example: in the matrix P[7], we say: given y8 (the column), the distribution of y7=k is (P[7])[y8][y7]]
-    '''
+    """
     init_tables()
     T_res = np.array([None]*(2**n)*n).reshape(n, 2**n)  # memo - keeping results iteratively. saving HUGE time.
     T_res[0][:] = 1
@@ -130,56 +110,44 @@ def exercise7(temps, imgPerTemp, dim):
 
 
 def Z_temp(temp, ex):
-    '''
+    """
     :param temp: The desired temperature
     :param ex: Number of exercise (3,4,5,6)
-    :return: The computation of Z_temp
-    '''
-    n = 2 if ex in [3, 5] else 3    # Dimension of the lattice, depends on the Exercise
-    if ex == 3 or ex == 4:
-        return sum(np.exp(1/temp * neighbors(np.array(X).reshape(n, n)))
-                   for X in product([-1, 1], repeat=n*n))
+    :return: The computation of Z_temp by method from exercise ex
+    """
+    values = [-1, 1]
+    if ex == 3:
+        return sum(np.exp(1 / temp * (x1 * x2 + x1 * x3 + x2 * x4 + x3 * x4))
+                   for x1 in values for x2 in values for x3 in values for x4 in values)
+    elif ex == 4:
+        return sum(np.exp(1/temp * (x1*x2 + x2*x3 + x4*x5 + x5*x6 + x7*x8 + x8*x9 + x1*x4 + x2*x5 + x3*x6 + x4*x7 + x5*x8 + x6*x9))
+                   for x1 in values for x2 in values for x3 in values for x4 in values for x5 in values for x6 in values for x7 in values for x8 in values for x9 in values)
     elif ex == 5:
-        return sum(G(y2row(Y[0], width=2), temp) *
-                   G(y2row(Y[1], width=2), temp) *
-                   F(y2row(Y[0], width=2), y2row(Y[1], width=2), temp)
-                   for Y in product(range(4), repeat=2))
+        values = [y2row(y, width=2) for y in range(4)]
+        return sum(G(y1, temp) * G(y2, temp) * F(y1, y2, temp)
+                   for y1 in values for y2 in values)
     elif ex == 6:
-        return sum(G(y2row(Y[0], width=3), temp) *
-                   G(y2row(Y[1], width=3), temp) *
-                   G(y2row(Y[2], width=3), temp) *
-                   F(y2row(Y[0], width=3), y2row(Y[1], width=3), temp) *
-                   F(y2row(Y[1], width=3), y2row(Y[2], width=3), temp)
-                   for Y in product(range(8), repeat=3))
+        values = [y2row(y, width=3) for y in range(8)]
+        return sum(G(y1, temp) * G(y2, temp) * G(y3, temp) * F(y1, y2, temp) * F(y2, y3, temp)
+                   for y1 in values for y2 in values for y3 in values)
     return None
 
 
 if __name__ == '__main__':
-    print("Exercise 3 (2x2 lattice):")
-    print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=3)}\n' for i in [1, 1.5, 2]])
+    print("Exercise 3 (2x2 lattice):", end="")
+    print(*[f"\nZ(temp={i})  =  {Z_temp(temp=i, ex=3)}" for i in [1, 1.5, 2]])
 
-    print("Exercise 4 (3x3 lattice):")
-    print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=4)}\n' for i in [1, 1.5, 2]])
+    print("\nExercise 4 (3x3 lattice):", end="")
+    print(*[f'\nZ(temp={i})  =  {Z_temp(temp=i, ex=4)}' for i in [1, 1.5, 2]])
 
-    print("Exercise 5 (2x2 lattice):")
-    print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=5)}\n' for i in [1, 1.5, 2]])
+    print("\nExercise 5 (2x2 lattice):", end="")
+    print(*[f'\nZ(temp={i})  =  {Z_temp(temp=i, ex=5)}' for i in [1, 1.5, 2]])
 
-    print("Exercise 6: (3x3 lattice)")
-    print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=6)}\n' for i in [1, 1.5, 2]])
+    print("\nExercise 6: (3x3 lattice)", end="")
+    print(*[f'\nZ(temp={i})  =  {Z_temp(temp=i, ex=6)}' for i in [1, 1.5, 2]])
 
-    print("Exercise 7: (8x8 lattice)      --  NOT FINISHED!")
+    print("\nPrinting images of exercise 7... (8x8 lattice)")
     exercise7(temps=[1, 1.5, 2], imgPerTemp=10, dim=8)
-    # print(*[f'Z(temp={i})  =  {Z_temp(temp=i, ex=7)[0]}\n' for i in [1, 1.5, 2]])
+    print("Printed successfully!")
 
-    # P = Z_temp(temp=1, ex=7)[2]
-    # pc = [None for i in range(9)]
-    # pp = np.array([None for i in range(9)])
-    # for i in range(8, 0, -1):
-    #     pc[i] = np.random.choice(range(256))
-    # for i in range(8, 0, -1):
-    #     if i==8:
-    #         pp[i] = P[i][pc[i]]
-    #     else:
-    #         pp[i] = P[i][pc[i]][pc[i+1]]
-    # p8 = np.random.choice(range(256))
 
