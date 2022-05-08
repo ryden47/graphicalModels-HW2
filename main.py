@@ -1,5 +1,5 @@
 import numpy as np
-import time
+import time, random
 import matplotlib.pyplot as plt
 
 
@@ -94,7 +94,7 @@ def generateImage(P):
     return image
 
 
-def exercise7(temps, imgPerTemp, dim):
+def ex7(temps, imgPerTemp, dim):
     P_all = [find_P(temp=t, n=dim) for t in temps]
     images = [[generateImage(P_all[t]) for i in range(imgPerTemp)] for t in range(len(temps))]
     fig, ax = plt.subplots(len(temps), imgPerTemp)
@@ -107,6 +107,48 @@ def exercise7(temps, imgPerTemp, dim):
     fig.tight_layout()
     fig.suptitle(f"Exercise 7: Results for a {dim}x{dim} lattice:", fontsize=32)
     plt.show()
+    return temps, P_all
+
+
+def ex8(P, temps):
+    images = [[generateImage(P[t]) for i in range(10000)] for t in range(len(temps))]
+    for i, temp in enumerate(temps):
+        a = 1/10000 * sum(x[0][0]*x[1][1] for x in images[i])
+        b = 1/10000 * sum(x[0][0]*x[7][7] for x in images[i])
+        print(f'E_(temp={temp})(x11,x22)  :=  {a:0.4f}')
+        print(f'E_(temp={temp})(x11,x88)  :=  {b:0.4f}')
+
+
+def p(i, j, ext_sample, temp):
+    up = 1/temp * (ext_sample[i+1][j] + ext_sample[i-1][j] + ext_sample[i][j+1] + ext_sample[i][j-1])
+    denominator = np.exp(up) + np.exp(-up)
+    return np.exp(up)/denominator if ext_sample[i][j] == 1 else np.exp(-up)/denominator
+
+
+def ex9(temps, n=8, num_of_samples=10000, num_of_sweeps=25):
+    images_list = [[] for t in range(len(temps))]
+    for t, temp in enumerate(temps):
+        for s in range(num_of_samples):
+            if s%100==0:  # just for debugging
+                percent = int(s*len(temps)/num_of_samples*100)
+                print(f'|| {percent}%', end="\n" if percent%10==0 else " ")
+            sample = np.random.randint(low=0, high=2, size=(n, n))*2-1
+            extend_sample = np.zeros((n+2, n+2))
+            extend_sample[1:n+1, 1:n+1] = sample
+            for sweep in range(num_of_sweeps):
+                for idx, site in np.ndenumerate(extend_sample[1:n+1, 1:n+1]):
+                    px = p(*idx, extend_sample, temp=temp)
+                    if px < 1:
+                        extend_sample[idx] *= -1
+                    elif px == 1:
+                        extend_sample[idx] = random.choice([-1, 1])
+            images_list[t].append(extend_sample)
+    for t, temp in enumerate(temps):
+        e_x11x22 = 1/num_of_samples * sum(x[1][1]*x[2][2] for x in images_list[t])
+        e_x11x88 = 1/num_of_samples * sum(x[1][1]*x[8][8] for x in images_list[t])
+        print(f'E_(temp={temp})(x11,x22)  :=  {e_x11x22:0.4f}')
+        print(f'E_(temp={temp})(x11,x88)  :=  {e_x11x88:0.4f}')
+    i_stopped_here = 1
 
 
 def Z_temp(temp, ex):
@@ -134,20 +176,26 @@ def Z_temp(temp, ex):
 
 
 if __name__ == '__main__':
-    print("Exercise 3 (2x2 lattice):", end="")
-    print(*[f"\nZ(temp={i})  =  {Z_temp(temp=i, ex=3)}" for i in [1, 1.5, 2]])
+    # print("Exercise 3 (2x2 lattice):", end="")
+    # print(*[f"\nZ(temp={i})  =  {Z_temp(temp=i, ex=3)}" for i in [1, 1.5, 2]])
+    #
+    # print("\nExercise 4 (3x3 lattice):", end="")
+    # print(*[f'\nZ(temp={i})  =  {Z_temp(temp=i, ex=4)}' for i in [1, 1.5, 2]])
+    #
+    # print("\nExercise 5 (2x2 lattice):", end="")
+    # print(*[f'\nZ(temp={i})  =  {Z_temp(temp=i, ex=5)}' for i in [1, 1.5, 2]])
+    #
+    # print("\nExercise 6: (3x3 lattice)", end="")
+    # print(*[f'\nZ(temp={i})  =  {Z_temp(temp=i, ex=6)}' for i in [1, 1.5, 2]])
 
-    print("\nExercise 4 (3x3 lattice):", end="")
-    print(*[f'\nZ(temp={i})  =  {Z_temp(temp=i, ex=4)}' for i in [1, 1.5, 2]])
+    # print("\nExercise 7: Printing images... (8x8 lattice)")
+    # temps, P_all = ex7(temps=[1, 1.5], imgPerTemp=10, dim=8)
+    # print("Printed successfully!")
+    #
+    # print("\nExercise 8: Calculating empirical expectations... ")
+    # ex8(P_all, temps=temps)
 
-    print("\nExercise 5 (2x2 lattice):", end="")
-    print(*[f'\nZ(temp={i})  =  {Z_temp(temp=i, ex=5)}' for i in [1, 1.5, 2]])
-
-    print("\nExercise 6: (3x3 lattice)", end="")
-    print(*[f'\nZ(temp={i})  =  {Z_temp(temp=i, ex=6)}' for i in [1, 1.5, 2]])
-
-    print("\nPrinting images of exercise 7... (8x8 lattice)")
-    exercise7(temps=[1, 1.5, 2], imgPerTemp=10, dim=8)
-    print("Printed successfully!")
+    print("\nExercise 9: --- NOT FINISHED ---")
+    ex9(temps=[1])
 
 
