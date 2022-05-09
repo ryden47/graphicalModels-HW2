@@ -258,6 +258,6 @@ if __name__ == '__main__':
     ex9(temps=[1, 1.5, 2])
 
     total = int(time.perf_counter() - start)
-    print(f"\n\n\nTotal runtime: {total//60} minutes and {total%60} seconds.")
+    print(f"\n\n\nTotal runtime: {total//60} minutes and {total%60} seconds.\n")
 
 
