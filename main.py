@@ -1,6 +1,16 @@
 import numpy as np
-import time, random
+import time, sys
 import matplotlib.pyplot as plt
+import threading
+
+
+def display_timer(seconds):
+    for remaining in range(seconds-2, 0, -1):
+        sys.stdout.write("\r")
+        sys.stdout.write("{:2d} minutes and {:2d} seconds remaining (approximately).".format(remaining//60, remaining%60))
+        sys.stdout.flush()
+        time.sleep(1)
+    sys.stdout.write("\rAny minute now...            \n")
 
 
 def init_tables(n=8):
@@ -111,44 +121,71 @@ def ex7(temps, imgPerTemp, dim):
 
 
 def ex8(P, temps):
-    images = [[generateImage(P[t]) for i in range(10000)] for t in range(len(temps))]
-    for i, temp in enumerate(temps):
-        a = 1/10000 * sum(x[0][0]*x[1][1] for x in images[i])
-        b = 1/10000 * sum(x[0][0]*x[7][7] for x in images[i])
-        print(f'E_(temp={temp})(x11,x22)  :=  {a:0.4f}')
-        print(f'E_(temp={temp})(x11,x88)  :=  {b:0.4f}')
-
-
-def p(i, j, ext_sample, temp):
-    up = 1/temp * (ext_sample[i+1][j] + ext_sample[i-1][j] + ext_sample[i][j+1] + ext_sample[i][j-1])
-    denominator = np.exp(up) + np.exp(-up)
-    return np.exp(up)/denominator if ext_sample[i][j] == 1 else np.exp(-up)/denominator
-
-
-def ex9(temps, n=8, num_of_samples=10000, num_of_sweeps=25):
-    images_list = [[] for t in range(len(temps))]
     for t, temp in enumerate(temps):
+        e_11_22, e_11_88 = 0, 0
+        for i in range(10000):
+            img = generateImage(P[t])
+            e_11_22 = update_average(e_11_22, i, img[0, 0]*img[1, 1])
+            e_11_88 = update_average(e_11_88, i, img[0, 0]*img[7, 7])
+        print(f'\tE_(temp={temp:>3})(x11,x22)  =  {e_11_22:0.4f}')
+        print(f'\tE_(temp={temp:>3})(x11,x88)  =  {e_11_88:0.4f}')
+
+
+def single_sweep(ext_sample, temp):
+    for i in range(1, ext_sample.shape[0]-1):
+        for j in range(1, ext_sample.shape[1]-1):
+            up = 1/temp * (ext_sample[i+1][j] + ext_sample[i-1][j] + ext_sample[i][j+1] + ext_sample[i][j-1])
+            bottom = np.exp(-up) + np.exp(up)
+            coin_bias = np.exp(up) / bottom
+            ext_sample[i, j] = np.random.binomial(1, coin_bias)*2-1  # There is a coin_bias chance to get -1, and 1-coin_bias chance to get 1
+
+
+update_average = lambda old_avg, old_total, to_add: \
+    ((old_total * old_avg) + to_add) / (old_total + 1)
+
+
+def create_random_sample(n):
+    sample = np.random.randint(low=0, high=2, size=(n, n)) * 2 - 1
+    extend_sample = np.zeros((n + 2, n + 2))
+    extend_sample[1:n + 1, 1:n + 1] = sample
+    return extend_sample
+
+
+def independent_method(temps, n, num_of_samples, num_of_sweeps):  # this one takes A LOT of time to complete...
+    for t, temp in enumerate(temps):
+        e_x11x22, e_x11x88 = 0, 0
         for s in range(num_of_samples):
-            if s%100==0:  # just for debugging
-                percent = int(s*len(temps)/num_of_samples*100)
-                print(f'|| {percent}%', end="\n" if percent%10==0 else " ")
-            sample = np.random.randint(low=0, high=2, size=(n, n))*2-1
-            extend_sample = np.zeros((n+2, n+2))
-            extend_sample[1:n+1, 1:n+1] = sample
+            extend_sample = create_random_sample(n)
             for sweep in range(num_of_sweeps):
-                for idx, site in np.ndenumerate(extend_sample[1:n+1, 1:n+1]):
-                    px = p(*idx, extend_sample, temp=temp)
-                    if px < 1:
-                        extend_sample[idx] *= -1
-                    elif px == 1:
-                        extend_sample[idx] = random.choice([-1, 1])
-            images_list[t].append(extend_sample)
+                single_sweep(extend_sample, temp=temp)
+            e_x11x22 = update_average(e_x11x22, s, extend_sample[1, 1] * extend_sample[2, 2])
+            e_x11x88 = update_average(e_x11x88, s, extend_sample[1, 1] * extend_sample[8, 8])
+        print(f'\t\tE_(temp={temp:>3})(x11,x22)  :=  {e_x11x22}')
+        print(f'\t\tE_(temp={temp:>3})(x11,x88)  :=  {e_x11x88}')
+
+
+def ergodicity(temps, n, num_of_sweeps):
+    print("\tCalculating empirical mean (Ergodicity method)...")
+    e_x11x22, e_x11x88 = [0] * len(temps), [0] * len(temps)
     for t, temp in enumerate(temps):
-        e_x11x22 = 1/num_of_samples * sum(x[1][1]*x[2][2] for x in images_list[t])
-        e_x11x88 = 1/num_of_samples * sum(x[1][1]*x[8][8] for x in images_list[t])
-        print(f'E_(temp={temp})(x11,x22)  :=  {e_x11x22:0.4f}')
-        print(f'E_(temp={temp})(x11,x88)  :=  {e_x11x88:0.4f}')
-    i_stopped_here = 1
+        extend_sample = create_random_sample(n)
+        for s in range(-100, num_of_sweeps-100):
+            single_sweep(extend_sample, temp=temp)
+            if s >= 0:
+                e_x11x22[t] = update_average(e_x11x22[t], s, extend_sample[1, 1] * extend_sample[2, 2])
+                e_x11x88[t] = update_average(e_x11x88[t], s, extend_sample[1, 1] * extend_sample[8, 8])
+    for t, temp in enumerate(temps):
+        print(f'\t\tE_(temp={temp:>3})(x11,x22)  :=  {e_x11x22[t]}')
+        print(f'\t\tE_(temp={temp:>3})(x11,x88)  :=  {e_x11x88[t]}')
+    print("\tCalculating empirical mean (Independent method)...")  # since ergodicity finishes before independent
+
+
+def ex9(temps, n=8):
+    # thread_pool = [threading.Thread(target=independent_method, args=())]
+    thread = threading.Thread(target=independent_method, args=(temps, n, 10000, 25))
+    ergodicity(temps, n, num_of_sweeps=25000)
+    thread.start()
+    thread.join()
 
 
 def Z_temp(temp, ex):
@@ -176,26 +213,30 @@ def Z_temp(temp, ex):
 
 
 if __name__ == '__main__':
-    # print("Exercise 3 (2x2 lattice):", end="")
-    # print(*[f"\nZ(temp={i})  =  {Z_temp(temp=i, ex=3)}" for i in [1, 1.5, 2]])
-    #
-    # print("\nExercise 4 (3x3 lattice):", end="")
-    # print(*[f'\nZ(temp={i})  =  {Z_temp(temp=i, ex=4)}' for i in [1, 1.5, 2]])
-    #
-    # print("\nExercise 5 (2x2 lattice):", end="")
-    # print(*[f'\nZ(temp={i})  =  {Z_temp(temp=i, ex=5)}' for i in [1, 1.5, 2]])
-    #
-    # print("\nExercise 6: (3x3 lattice)", end="")
-    # print(*[f'\nZ(temp={i})  =  {Z_temp(temp=i, ex=6)}' for i in [1, 1.5, 2]])
+    print("Exercise 3 (2x2 lattice):", end="")
+    print(*[f"\n\tZ(temp={i:>3})  =  {Z_temp(temp=i, ex=3)}" for i in [1, 1.5, 2]])
 
-    # print("\nExercise 7: Printing images... (8x8 lattice)")
-    # temps, P_all = ex7(temps=[1, 1.5], imgPerTemp=10, dim=8)
-    # print("Printed successfully!")
-    #
-    # print("\nExercise 8: Calculating empirical expectations... ")
-    # ex8(P_all, temps=temps)
+    print("\n\nExercise 4 (3x3 lattice):", end="")
+    print(*[f'\n\tZ(temp={i:>3})  =  {Z_temp(temp=i, ex=4)}' for i in [1, 1.5, 2]])
 
-    print("\nExercise 9: --- NOT FINISHED ---")
-    ex9(temps=[1])
+    print("\n\nExercise 5 (2x2 lattice):", end="")
+    print(*[f'\n\tZ(temp={i:>3})  =  {Z_temp(temp=i, ex=5)}' for i in [1, 1.5, 2]])
+
+    print("\n\nExercise 6: (3x3 lattice)", end="")
+    print(*[f'\n\tZ(temp={i:>3})  =  {Z_temp(temp=i, ex=6)}' for i in [1, 1.5, 2]])
+
+    print("\n\nExercise 7: Printing images... (8x8 lattice)")
+    temps, P_all = ex7(temps=[1, 1.5, 2], imgPerTemp=10, dim=8)
+    print("Printed successfully!")
+
+    print("\n\nExercise 8: Calculating empirical expectations (exact sampling)... ")
+    ex8(P_all, temps=temps)
+
+
+    start = time.perf_counter()
+    print("\n\nExercise 9:")
+    ex9(temps=[1, 2, 3])
+    total = time.perf_counter() - start
+    print(f'It took me {total//60} minutes and {total%60} seconds')
 
 
