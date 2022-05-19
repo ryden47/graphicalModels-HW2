@@ -127,8 +127,8 @@ def ex7(temps, imgPerTemp, dim):
     for t in range(len(temps)):
         for m in range(10):
             ax[t, m].imshow(images[t][m], interpolation='None', cmap='Greys', vmin=-1, vmax=1)
-    for ax1, t_label in zip(ax[:, 0], [f"Temp {t}" for t in temps]):
-        ax1.set_ylabel(t_label, rotation=90, size=24)
+    for ax1, t_label in zip(ax[:, 0], [f"Temp {t}           " for t in temps]):
+        ax1.set_ylabel(t_label, rotation=45, size=24)
     fig.set_size_inches(25, 10)
     fig.tight_layout()
     fig.suptitle(f"Exercise 7: Results for a {dim}x{dim} lattice:", fontsize=32)
@@ -147,13 +147,17 @@ def ex8(P, temps):
         print(f'\tE_(temp={temp:<3})(x11,x88)  =  {e_11_88:0.4f}')
 
 
-def single_sweep(ext_sample, temp):
+def single_sweep(ext_sample, temp, y=None, by_most_likely=False):       # y=x+eta is the noisy sample. relevant only for exercise 10
     for i in range(1, ext_sample.shape[0]-1):
         for j in range(1, ext_sample.shape[1]-1):
-            up = 1/temp * (ext_sample[i+1][j] + ext_sample[i-1][j] + ext_sample[i][j+1] + ext_sample[i][j-1])
-            bottom = np.exp(-up) + np.exp(up)
-            coin_bias = np.exp(up) / bottom
-            ext_sample[i, j] = np.random.binomial(1, coin_bias)*2-1  # There is a coin_bias chance to get -1, and 1-coin_bias chance to get 1
+            sum_neighbors = 1/temp * (ext_sample[i + 1][j] + ext_sample[i - 1][j] + ext_sample[i][j + 1] + ext_sample[i][j - 1])
+            a = np.exp(+sum_neighbors - (((1/(2*4))*((y[i, j]-1)**2)) if y is not None else 0))    # Xs =  1
+            b = np.exp(-sum_neighbors - (((1/(2*4))*((y[i, j]+1)**2)) if y is not None else 0))    # Xs = -1
+            coin_bias = a/(a+b)  # <coin_bias> chance to get 1. otherwise, -1
+            if by_most_likely:
+                ext_sample[i, j] = 1 if a > b else -1
+            else:
+                ext_sample[i, j] = np.random.binomial(1, coin_bias) * 2 - 1
 
 
 update_average = lambda old_avg, old_total, to_add: \
@@ -210,6 +214,46 @@ def ex9(temps, n=8):
     ergodicity(temps, n, num_of_sweeps=25000)
 
 
+def ex10(temps):
+    fig, ax = plt.subplots(len(temps), 5)
+    for t, temp in enumerate(temps):
+        ax[t, 0].set_ylabel(f"Temp={temp}           ", rotation=45, size=24)
+
+        x = create_random_sample(n=100)
+        for i in range(50):
+            single_sweep(x, temp)
+        ax[t, 0].imshow(x, interpolation='None', cmap='Greys', vmin=-1, vmax=1)
+        ax[t, 0].set_xlabel("x", size=20)
+
+        eta = 2*np.random.standard_normal(size=(100, 100))
+        extend_eta = np.zeros((102, 102))
+        extend_eta[1:101, 1:101] = eta
+        y = x + extend_eta
+        ax[t, 1].imshow(y, interpolation='None', cmap='Greys')
+        ax[t, 1].set_xlabel("y = x+eta", size=20)
+
+        x_post = np.copy(x)      # OR maybe it's suppose to be a new 'create_random_sample(n=100)' ??
+        for i in range(50):
+            single_sweep(x_post, temp, y)
+        ax[t, 2].imshow(x_post, interpolation='None', cmap='Greys', vmin=-1, vmax=1)
+        ax[t, 2].set_xlabel("x ~ p(x|y)", size=20)
+
+        icm = np.copy(x)
+        single_sweep(icm, temp, y, by_most_likely=True)
+        ax[t, 3].imshow(icm, interpolation='None', cmap='Greys', vmin=-1, vmax=1)
+        ax[t, 3].set_xlabel("argmax p(Xs | sX,y)", size=20)
+
+        y2 = np.copy(y)
+        single_sweep(y2, temp, x, by_most_likely=True)
+        ax[t, 4].imshow(y2, interpolation='None', cmap='Greys')
+        ax[t, 4].set_xlabel("argmax p(y|x)", size=20)
+
+    fig.set_size_inches(25, 10)
+    fig.tight_layout()
+    fig.suptitle(f"Exercise 10:", fontsize=32)
+    plt.show()
+
+
 def Z_temp(temp, ex):
     """
     :param temp: The desired temperature
@@ -256,6 +300,10 @@ if __name__ == '__main__':
 
     print("\n\nExercise 9:")
     ex9(temps=[1, 1.5, 2])
+
+    print("\n\nExercise 10: Printing images...")
+    ex10(temps=[1, 1.5, 2])
+    print("\tPrinted successfully!")
 
     total = int(time.perf_counter() - start)
     print(f"\n\n\nTotal runtime: {total//60} minutes and {total%60} seconds.\n")
