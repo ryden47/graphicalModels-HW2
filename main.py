@@ -4,29 +4,12 @@ import matplotlib.pyplot as plt
 import threading
 
 
-def display_timer(seconds, temp, timer_display):
-    for remaining in range(seconds, -1, -1):
-        if timer_display.flag:
-            sys.stdout.flush()
-            break  # stop display
-        sys.stdout.write("\r")
-        sys.stdout.write("\t\t\t{:2d}:{} remaining for temp={} (approximately)".format(remaining//60, remaining%60, temp))
+def display_bar(percent, temp):
+    sys.stdout.write("\r")
+    sys.stdout.write(f"\t\t{percent:>5}% completed (temp={temp})")
+    if percent > 99:
         sys.stdout.flush()
-        time.sleep(1)
-    while not timer_display.flag:
-        sys.stdout.write("\r\t\tany second now...")
-    sys.stdout.flush()
-    sys.stdout.write("\r")
-    sys.stdout.write("\r")
-
-
-class TimerDisplay:
-    def __init__(self):
-        self.flag = False
-
-    def stop(self):
-        self.flag = True
-        time.sleep(1.1)
+        sys.stdout.write("\r")
 
 
 def init_tables(n=8):
@@ -140,6 +123,7 @@ def ex8(P, temps):
     for t, temp in enumerate(temps):
         e_11_22, e_11_88 = 0, 0
         for i in range(10000):
+            display_bar(round((i/10000)*100, 2), temp)  # displaying completion percent
             img = generateImage(P[t])
             e_11_22 = update_average(e_11_22, i, img[0, 0]*img[1, 1])
             e_11_88 = update_average(e_11_88, i, img[0, 0]*img[7, 7])
@@ -174,18 +158,14 @@ def create_random_sample(n):
 def independent_method(temps, n, num_of_samples, num_of_sweeps):  # this one takes A LOT of time to complete..
     print("\tCalculating empirical mean (Independent method)...")
     for t, temp in enumerate(temps):
-        start, timer_display = time.perf_counter(), TimerDisplay()
         e_x11x22, e_x11x88 = 0, 0
         for s in range(num_of_samples):
-            if s == 100:  # just for the display timer
-                approx_seconds = int((time.perf_counter()-start)*((num_of_samples//100)-1))
-                threading.Thread(target=display_timer, args=(approx_seconds,temp,timer_display,)).start()
+            display_bar(round((s/num_of_samples)*100, 2), temp)       # displaying completion percent
             extend_sample = create_random_sample(n)
             for sweep in range(num_of_sweeps):
                 single_sweep(extend_sample, temp=temp)
             e_x11x22 = update_average(e_x11x22, s, extend_sample[1, 1] * extend_sample[2, 2])
             e_x11x88 = update_average(e_x11x88, s, extend_sample[1, 1] * extend_sample[8, 8])
-        timer_display.stop()
         print(f'\t\tE_(temp={temp:<3})(x11,x22)  =  {e_x11x22}')
         print(f'\t\tE_(temp={temp:<3})(x11,x88)  =  {e_x11x88}')
 
@@ -194,17 +174,13 @@ def ergodicity(temps, n, num_of_sweeps):
     print("\tCalculating empirical mean (Ergodicity method)...")
     e_x11x22, e_x11x88 = 0, 0
     for t, temp in enumerate(temps):
-        start, timer_display = time.perf_counter(), TimerDisplay()
         extend_sample = create_random_sample(n)
         for s in range(-100, num_of_sweeps-100):
-            if s == -1:  # just for the display timer
-                approx_seconds = int((time.perf_counter()-start)*((num_of_sweeps//100)-1))
-                threading.Thread(target=display_timer, args=(approx_seconds,temp,timer_display,)).start()
+            display_bar(round(((s+100)/num_of_sweeps)*100, 2), temp)        # displaying completion percent
             single_sweep(extend_sample, temp=temp)
             if s >= 0:
                 e_x11x22 = update_average(e_x11x22, s, extend_sample[1, 1] * extend_sample[2, 2])
                 e_x11x88 = update_average(e_x11x88, s, extend_sample[1, 1] * extend_sample[8, 8])
-        timer_display.stop()
         print(f'\t\tE_(temp={temp:<3})(x11,x22)  =  {e_x11x22}')
         print(f'\t\tE_(temp={temp:<3})(x11,x88)  =  {e_x11x88}')
 
